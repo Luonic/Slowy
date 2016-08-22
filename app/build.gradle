@@ -1,0 +1,58 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 22
+    buildToolsVersion '24.0.1'
+    defaultConfig {
+        applicationId "com.sleepycatstudios.slowy"
+        minSdkVersion 19
+        targetSdkVersion 19
+        versionCode 1
+        versionName "1.0"
+    }
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            renderscriptDebuggable true
+        }
+    }
+    productFlavors {
+    }
+
+    packagingOptions {
+        exclude 'META-INF/services/javax.annotation.processing.Processor'
+        pickFirst  'META-INF/maven/org.bytedeco.javacpp-presets/opencv/pom.properties'
+        pickFirst  'META-INF/maven/org.bytedeco.javacpp-presets/opencv/pom.xml'
+        pickFirst  'META-INF/maven/org.bytedeco.javacpp-presets/ffmpeg/pom.properties'
+        pickFirst  'META-INF/maven/org.bytedeco.javacpp-presets/ffmpeg/pom.xml'
+    }
+}
+
+repositories {
+    maven { url 'https://github.com/channguyen/range-slider-view/releases' }
+    mavenCentral()
+}
+
+dependencies {
+    compile fileTree(include: ['*.jar'], dir: 'libs')
+    testCompile 'junit:junit:4.12'
+    //compile 'com.android.support:appcompat-v7:23.4.0'
+    compile 'com.android.support:appcompat-v7:22.1.0'
+    compile 'com.github.channguyen:rsv:1.0.1'
+    compile 'org.bytedeco:javacv:+'
+    //compile 'org.bytedeco:javacv:1.2'
+    compile 'org.bytedeco:javacpp:1.2.3'
+    compile 'org.bytedeco.javacpp-presets:opencv:3.1.0-1.2:android-arm'
+    compile 'org.bytedeco.javacpp-presets:ffmpeg:3.0.2-1.2:android-arm'
+    compile 'org.bytedeco.javacpp-presets:opencv:3.1.0-1.2:android-x86'
+    compile 'org.bytedeco.javacpp-presets:ffmpeg:3.0.2-1.2:android-x86'
+}
+
+configurations {
+    all*.exclude group: 'org.bytedeco', module: 'javacpp-presets'
+}
