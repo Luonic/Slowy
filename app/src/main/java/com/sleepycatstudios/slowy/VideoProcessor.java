@@ -1,9 +1,12 @@
 package com.sleepycatstudios.slowy;
 
+import android.graphics.Color;
 import android.net.Uri;
 import android.util.Log;
 
+import org.bytedeco.javacpp.indexer.FloatBufferIndexer;
 import org.bytedeco.javacpp.indexer.UByteBufferIndexer;
+import org.bytedeco.javacpp.opencv_core;
 import org.bytedeco.javacv.AndroidFrameConverter;
 import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.FFmpegFrameRecorder;
@@ -19,10 +22,23 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
+import static org.bytedeco.javacpp.helper.opencv_core.CV_RGB;
+import static org.bytedeco.javacpp.helper.opencv_core.RGB;
+import static org.bytedeco.javacpp.opencv_core.CV_32FC1;
+import static org.bytedeco.javacpp.opencv_core.FILLED;
+import static org.bytedeco.javacpp.opencv_core.LINE_8;
 import static org.bytedeco.javacpp.opencv_core.Mat;
+import static org.bytedeco.javacpp.opencv_core.cartToPolar;
+import static org.bytedeco.javacpp.opencv_core.normalize;
+import static org.bytedeco.javacpp.opencv_core.theRNG;
 import static org.bytedeco.javacpp.opencv_imgproc.COLOR_BGR2GRAY;
+import static org.bytedeco.javacpp.opencv_imgproc.COLOR_HSV2BGR;
+import static org.bytedeco.javacpp.opencv_imgproc.circle;
 import static org.bytedeco.javacpp.opencv_imgproc.cvtColor;
+import static org.bytedeco.javacpp.opencv_imgproc.line;
+import static org.bytedeco.javacpp.opencv_imgproc.threshold;
 import static org.bytedeco.javacpp.opencv_video.calcOpticalFlowFarneback;
+import static org.bytedeco.javacpp.opencv_video.cvKalmanUpdateByTime;
 
 public class VideoProcessor {
 
@@ -37,6 +53,8 @@ public class VideoProcessor {
 
     private static FrameGrabber grabber;
     private static FrameRecorder recorder;
+
+    private static FrameCalcThread[] frameCalcThreads = new FrameCalcThread[Runtime.getRuntime().availableProcessors()];
 
     public void onCreate() {
 
@@ -59,7 +77,7 @@ public class VideoProcessor {
         directory += FileHelper.getRealPathFromURI(inputVideoUri);
         File file = new File(directory);
         String path = file.getParent();
-        String filename = new SimpleDateFormat("'SlowMo_'yyyyMMddhhmm'.mp4'", Locale.getDefault()).format(new Date());
+        String filename = new SimpleDateFormat("'Slowy_'yyyyMMddhhmm'.mp4'", Locale.getDefault()).format(new Date());
         outputVideoPath = path + "/" + filename;
     }
 
@@ -161,7 +179,7 @@ public class VideoProcessor {
 
         int pixelVal;
         //Creating indexer for calculated optical flow
-        UByteBufferIndexer opticalFlowIndexer = opticalFlow.createIndexer();
+        FloatBufferIndexer opticalFlowIndexer = opticalFlow.createIndexer();
 
         //Creatring indexer for source matrix
         UByteBufferIndexer sourceFrameMatIndexer = sourceFrameMat.createIndexer();
@@ -175,30 +193,62 @@ public class VideoProcessor {
 
         for (int y = 0; y < matHeight; y++) {
             for (int x = 0; x < matWidth; x++) {
-                flowVecX = opticalFlowIndexer.get(y, x, 0);
-                flowVecY = opticalFlowIndexer.get(y, x, 1);
+                flowVecX = Math.round(opticalFlowIndexer.get(y, x, 0));
+                flowVecY = Math.round(opticalFlowIndexer.get(y, x, 1));
 
                 dstCoordX = x + Math.round(flowVecX * vecMultiplier);
                 dstCoordY = y + Math.round(flowVecY * vecMultiplier);
 
                 //If index not out of bounds
-                if (dstCoordX < matWidth && y + dstCoordY < matHeight) {
+                if (dstCoordX < matWidth && dstCoordY < matHeight) {
+                    float[] hsv = new float[3];
+                    hsv[0] = (int)Math.round(Math.atan2(255f / opticalFlowIndexer.get(y, x, 0), 255f / opticalFlowIndexer.get(y, x, 1)) / Math.PI * 180);
+                    hsv[1] = 1;
+                    hsv[2] = 1;
+                    int rgb = Color.HSVToColor(hsv);
+
+
+
                     //Moving pixels by channel
                     pixelVal = sourceFrameMatIndexer.get(y, x, 0);
-                    dstFrameMatIndexer.put(dstCoordY, dstCoordX, 0, pixelVal);
+                    //dstFrameMatIndexer.put(dstCoordY, dstCoordX, 0, pixelVal);
+                    dstFrameMatIndexer.put(y, x, 0, Color.blue(rgb));
 
                     pixelVal = sourceFrameMatIndexer.get(y, x, 1);
-                    dstFrameMatIndexer.put(dstCoordY, dstCoordX, 1, pixelVal);
+                    //dstFrameMatIndexer.put(dstCoordY, dstCoordX, 1, pixelVal);
+                    dstFrameMatIndexer.put(y, x, 1, Color.green(rgb));
 
                     pixelVal = sourceFrameMatIndexer.get(y, x, 2);
-                    dstFrameMatIndexer.put(dstCoordY, dstCoordX, 2, pixelVal);
+                    //dstFrameMatIndexer.put(dstCoordY, dstCoordX, 2, pixelVal);
+                    dstFrameMatIndexer.put(y, x, 2, Color.red(rgb));
                 }
             }
         }
-        sourceFrameMatIndexer.release();
-        dstFrameMatIndexer.release();
-        return dstFrameMat;
+        //opticalFlowIndexer.release();
+        //sourceFrameMatIndexer.release();
+        //dstFrameMatIndexer.release();
+        return drawOpticalFlowMap(dstFrameMat, opticalFlow, 64);
+        //return dstFrameMat;
     }
+
+    private static Mat drawOpticalFlowMap (Mat frame, Mat opticalFlow, int step) {
+        FloatBufferIndexer flowIndexer = opticalFlow.createIndexer();
+        opencv_core.Point dstPoint = new opencv_core.Point(0, 0);
+        opencv_core.Point srcPoint = new opencv_core.Point(0, 0);
+        for(int y = 0; y < opticalFlow.arrayHeight(); y += step)
+            for(int x = 0; x < opticalFlow.arrayWidth(); x += step)
+            {
+
+                dstPoint.x(Math.round(flowIndexer.get(y, x, 0) + x));
+                dstPoint.y(Math.round(flowIndexer.get(y, x, 1) + y));
+                srcPoint.x(x);
+                srcPoint.y(y);
+                line(frame, srcPoint, dstPoint, RGB(0, 255, 0));
+                circle(frame, srcPoint, 1, RGB(0, 255, 0), 2, FILLED, 0);
+            }
+        return frame;
+    }
+
 
     private static Frame[] calculateFrames(Frame framePrev, Frame frameNext, int framesForCalc) {
 
@@ -212,7 +262,7 @@ public class VideoProcessor {
         //   data more directly between BufferedImage and IplImage or Mat via Frame objects.
 
         OpenCVFrameConverter.ToMat converterToMat = new OpenCVFrameConverter.ToMat();
-        AndroidFrameConverter converterToBitmap = new AndroidFrameConverter();
+        //AndroidFrameConverter converterToBitmap = new AndroidFrameConverter();
 
 
         Frame[] calculatedFrames = new Frame[framesForCalc];
@@ -227,15 +277,20 @@ public class VideoProcessor {
         cvtColor(framePrevMat, framePrevMatGray, COLOR_BGR2GRAY);
         cvtColor(frameNextMat, frameNextMatGray, COLOR_BGR2GRAY);
 
+
+        //frameNextMat.release();
+
         //final DenseOpticalFlow optFlowDualTVL1 = createOptFlow_DualTVL1();
 
         //optFlowDualTVL1.calc(framePrevMatGray, frameNextMatGray, opticalFlow);
         calcOpticalFlowFarneback(framePrevMatGray, frameNextMatGray, opticalFlow, 0.5, 1, 12, 2, 7, 1.5, 0);
+        //calcOpticalFlowFarneback(framePrevMatGray, frameNextMatGray, opticalFlow, 0.5, 3, 15, 3, 5, 1.2, 0);
+        //calcOpticalFlowFarneback(framePrevMat, frameNextMat, opticalFlow, 0.5, 1, 12, 2, 7, 1.5, 0);
 
-
+        Mat frameMat = null;
         for (int interpolatedFrameIndex = 0; interpolatedFrameIndex < framesForCalc; interpolatedFrameIndex++) {
             //Calculating time-interpolated frame
-            Mat frameMat = calculateFrame(framePrevMat, frameNextMat, interpolatedFrameIndex, framesToCalculate);
+            frameMat = calculateFrame(framePrevMat, opticalFlow, interpolatedFrameIndex, framesToCalculate);
 
             // Convert processedMat back to a Frame
             Frame frame = converterToMat.convert(frameMat);
@@ -246,7 +301,11 @@ public class VideoProcessor {
             //Add frame to array of calculated frames
             calculatedFrames[interpolatedFrameIndex] = frame;
         }
-
+        //framePrevMat.release();
+        //frameNextMatGray.release();
+        //frameNextMatGray.release();
+        //if (frameMat != null)
+            //frameMat.release();
         return calculatedFrames;
     }
 
@@ -268,36 +327,51 @@ public class VideoProcessor {
 
         try {
             //Processing video frames
-            Frame framePrev = grabber.grab().clone();
+            Frame framePrev;
+            do {
+                framePrev = grabber.grab().clone();
+            } while (framePrev.image == null);
+
             Log.d("VideoProcessor", "Video length is " + grabber.getLengthInFrames() + "frames");
 
             while (grabber.getFrameNumber() < 40) {//grabber.getLengthInFrames()) {
-                Frame frameNext = grabber.grab();
-                Frame[] calculatedFrames = new Frame[0];
-                if (frameNext.image != null && framePrev.image != null) {
-                    Log.d("VideoProcessor", "Processing frame " + grabber.getFrameNumber() + " of " + grabber.getLengthInFrames());
-                    calculatedFrames = calculateFrames(framePrev, frameNext, framesToCalculate);
-                }
-
-                if (frameNext.image == null) {
-                    Log.d("VideoProcessor", "Frame img is null");
-                } else {
-                    Log.d("VideoProcessor","Frame img in NOT null");
-                }
-
-
-
-                if (frameNext.image != null) {
-                    recorder.record(framePrev);
-                    for (Frame calculatedFrame : calculatedFrames) {
-                        recorder.record(calculatedFrame);
+                for (int i = 0; i < frameCalcThreads.length; i++) {
+                    frameCalcThreads[i] = null;
+                    if (grabber.getFrameNumber() < grabber.getLengthInFrames()) {
+                        Frame frameNext;
+                        do {
+                            frameNext = grabber.grab();
+                        } while (frameNext.image == null);
+                        frameCalcThreads[i] = new FrameCalcThread(framePrev, frameNext);
+                        Log.d("VideoProcessor", "Created new thread with id " + frameCalcThreads[i].getId());
+                        framePrev = frameNext.clone();
+                        frameCalcThreads[i].start();
                     }
-                    framePrev = frameNext.clone();
+                }
+
+                //Telling threads to wait other threads
+                for (int i = 0; i < frameCalcThreads.length; i++) {
+                    try {
+                        if (frameCalcThreads[i] != null)
+                            frameCalcThreads[i].join();
+                        Log.d("VideoProcessor", "Thread " + frameCalcThreads[i].getId() + " joined");
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                        Log.e("VideoProcessor", "Failed to join thread");
+                    }
+                }
+
+                //Recording original and generated frames for every thread
+                for (FrameCalcThread thread : frameCalcThreads){
+                    if (thread != null) {
+                        recorder.record(thread.framePrev);
+                        for (Frame frame : thread.result) {
+                            recorder.record(frame);
+                        }
+                    }
                 }
             }
-
             recorder.record(framePrev);
-
         } catch (FrameRecorder.Exception e) {
             e.printStackTrace();
         } catch (FrameGrabber.Exception e) {
@@ -315,6 +389,25 @@ public class VideoProcessor {
             grabber.stop();
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    static class FrameCalcThread extends Thread {
+        Frame framePrev;
+        Frame frameNext;
+
+        Frame[] result;
+
+        public FrameCalcThread(Frame framePrev, Frame frameNext) {
+            this.framePrev = framePrev.clone();
+            this.frameNext = frameNext.clone();
+            this.setPriority(MAX_PRIORITY);
+        }
+
+        @Override
+        public void run() {
+            Log.d("VideoProcessor","Calculation in thread " + this.getId() + " between frame " + grabber.getFrameNumber() + " and frame " + (grabber.getFrameNumber() + 1));
+            result = calculateFrames(framePrev, frameNext, framesToCalculate);
         }
     }
 }
