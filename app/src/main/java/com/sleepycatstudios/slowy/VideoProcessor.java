@@ -33,6 +33,7 @@ import static org.bytedeco.javacpp.opencv_core.Mat;
 import static org.bytedeco.javacpp.opencv_core.add;
 import static org.bytedeco.javacpp.opencv_core.addWeighted;
 import static org.bytedeco.javacpp.opencv_core.cartToPolar;
+import static org.bytedeco.javacpp.opencv_core.doubleRand;
 import static org.bytedeco.javacpp.opencv_core.merge;
 import static org.bytedeco.javacpp.opencv_core.multiply;
 import static org.bytedeco.javacpp.opencv_core.normalize;
@@ -186,21 +187,60 @@ public class VideoProcessor {
                 CV_INTER_NN);
 
         FloatBufferIndexer opticalFlowIndexer = opticalFlow.createIndexer();
-        UByteBufferIndexer dstFrameIndexer = dstFrameMat.createIndexer();
-
-        Mat weights1 = new Mat(width, height, CV_32F);
-        FloatBufferIndexer weights1Indexer = weights1.createIndexer();
-        float weight;
+        UByteBufferIndexer dstFrameMatIndexer = dstFrameMat.createIndexer();
+        UByteBufferIndexer blendedFramesMatIndexer = blendedFramesMat.createIndexer();
+        //Mat weights1 = new Mat(width, height, CV_32F);
+        //Mat weights2 = new Mat(width, height, CV_32F);
+        //FloatBufferIndexer weights1Indexer = weights1.createIndexer();
+        //FloatBufferIndexer weights2Indexer = weights2.createIndexer();
+        /*double weight;
         float flowX, flowY;
+        int blendedPixelR = 0;
+        int blendedPixelG = 0;
+        int blendedPixelB = 0;
+        int opticalFlowPixelR = 0;
+        int opticalFlowPixelG = 0;
+        int opticalFlowPixelB = 0;
+        double resultPixel;
         for (int y = 0; y < coordinatedOpticalFlow.arrayHeight(); y++) {
             for (int x = 0; x < coordinatedOpticalFlow.arrayWidth(); x++) {
                 flowX = opticalFlowIndexer.get(y, x, 0);
                 flowY = opticalFlowIndexer.get(y, x, 1);
-                weight = Math.round(Math.sqrt(flowX * flowX + flowY * flowY));
-                weights1Indexer.put(y, x, Math.round(255 - weight));
+                weight = 2.0 / Math.max(Math.sqrt(flowX * flowX + flowY * flowY), 2.0);
+                dstFrameMatIndexer.get(y, x, 0, opticalFlowPixelB);
+                dstFrameMatIndexer.get(y, x, 1, opticalFlowPixelG);
+                dstFrameMatIndexer.get(y, x, 2, opticalFlowPixelR);
+                blendedFramesMatIndexer.get(y, x, 0, blendedPixelB);
+                blendedFramesMatIndexer.get(y, x, 1, blendedPixelG);
+                blendedFramesMatIndexer.get(y, x, 2, blendedPixelR);
+                dstFrameMatIndexer.put(y, x, 0, Math.round(opticalFlowPixelB * weight + (1 - weight) * blendedPixelB);
+                dstFrameMatIndexer.put(y, x, 1, (int)Math.round(opticalFlowPixelG * weight + (1 - weight) * blendedPixelG));
+                dstFrameMatIndexer.put(y, x, 2, (int)Math.round(opticalFlowPixelR * weight + (1 - weight) * blendedPixelR));
+                //weights1Indexer.put(y, x, Math.round(weight));
+                //weights2Indexer.put(y, x, Math.round(255 - weight));
                 //TODO: complete this algo, calculate weights and later blend blended image with calculated image via blendlinear()
             }
+        }*/
+
+        Mat weights1 = new Mat(height, width, CV_32F);
+        Mat weights2 = new Mat(height, width, CV_32F);
+        FloatBufferIndexer weights1Indexer = weights1.createIndexer();
+        FloatBufferIndexer weights2Indexer = weights2.createIndexer();
+        double weight;
+        float flowX, flowY;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                flowX = opticalFlowIndexer.get(y, x, 0);
+                flowY = opticalFlowIndexer.get(y, x, 1);
+                weight = 1.0 / Math.min(Math.sqrt(flowX * flowX + flowY * flowY), 1.0);
+                weights1Indexer.put(y, x, Math.round(weight));
+                weights2Indexer.put(y, x, Math.round(1 - weight));
+            }
         }
+
+        Mat resultMat = new Mat();
+
+        blendLinear(dstFrameMat, blendedFramesMat, weights1, weights2, resultMat);
 
         //sourceFrameMat.release();
         //coordinatedOpticalFlow.release();
@@ -211,7 +251,9 @@ public class VideoProcessor {
         //dstFrameMatIndexer.release();
         //return drawOpticalFlowVectors(dstFrameMat, opticalFlow, 32);
         //return  drawOpticalFlowPoints(sourceFrameMat, opticalFlow);
-        return dstFrameMat;
+        //return dstFrameMat;
+        //return blendedFramesMat;
+        return resultMat;
     }
 
     private static Mat drawOpticalFlowVectors(Mat frame, Mat opticalFlow, int step) {
@@ -284,7 +326,7 @@ public class VideoProcessor {
         cvtColor(frameNextMat, frameNextMatGray, COLOR_RGB2GRAY);
 
 
-        frameNextMat.release();
+        //frameNextMat.release();
 
         Mat framePrevMatGrayReduced = new Mat();
         Mat frameNextMatGrayReduced = new Mat();
@@ -317,7 +359,7 @@ public class VideoProcessor {
                 80, //averaging window size; larger values increase the algorithm robustness to
                 // image noise and give more chances for fast motion detection, but yield more
                 // blurred motion field
-                24, //number of iterations the algorithm does at each pyramid level
+                12, //number of iterations the algorithm does at each pyramid level
                 5, //size of the pixel neighborhood used to find polynomial expansion in each pixel;
                 // larger values mean that the image will be approximated with smoother surfaces,
                 // yielding more robust algorithm and more blurred motion field,
@@ -338,7 +380,28 @@ public class VideoProcessor {
         //frameNextMatGray.release();
 
         Mat framesBlended = new Mat();
+
         addWeighted(framePrevMat, 0.5, frameNextMat, 0.5, 0.0, framesBlended);
+
+        /*Mat framesBlended = framePrevMat.clone();
+        UByteBufferIndexer framePrevMatIndexer = framePrevMat.createIndexer();
+        UByteBufferIndexer frameNextMatIndexer = frameNextMat.createIndexer();
+        UByteBufferIndexer framesBlendedIndexer = framesBlended.createIndexer();
+
+        int pixelPrev = 0;
+        int pixelNext = 0;
+        for(int y = 0; y < framePrevMat.arrayHeight(); y++)
+            for(int x = 0; x < framePrevMat.arrayWidth(); x++) {
+                pixelPrev = framePrevMatIndexer.get(y, x, 0);
+                pixelNext = frameNextMatIndexer.get(y, x, 0);
+                framesBlendedIndexer.put(y, x, 0, (int)((pixelPrev * 0.5) + (pixelNext * 0.5)));
+                pixelPrev = framePrevMatIndexer.get(y, x, 1);
+                pixelNext = frameNextMatIndexer.get(y, x, 1);
+                framesBlendedIndexer.put(y, x, 1, (int)((pixelPrev * 0.5) + (pixelNext * 0.5)));
+                pixelPrev = framePrevMatIndexer.get(y, x, 2);
+                pixelNext = frameNextMatIndexer.get(y, x, 2);
+                framesBlendedIndexer.put(y, x, 2, (int)((pixelPrev * 0.5) + (pixelNext * 0.5)));
+            }*/
 
         Mat frameMat = null;
         for (int interpolatedFrameIndex = 0; interpolatedFrameIndex < framesForCalc; interpolatedFrameIndex++) {
