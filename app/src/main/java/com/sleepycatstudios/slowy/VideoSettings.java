@@ -63,8 +63,8 @@ public class VideoSettings extends AppCompatActivity {
                     Thread.sleep(15);
                     publishProgress(0);
                     Thread.sleep(timeToNextFrame);//change this to affect playback speed, default is 15
-                } catch (InterruptedException e1) {
-                    e1.printStackTrace();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
             }
         }

@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Slowy</string>
+    <string name="rendering_progress_dialog_title">Rendering video</string>
+    <string name="rendering_progress_dialog_message">Please wait until complete...</string>
 </resources>
