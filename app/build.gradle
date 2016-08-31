@@ -51,6 +51,7 @@ dependencies {
     testCompile 'junit:junit:4.12'
     //compile 'com.android.support:appcompat-v7:23.4.0'
     compile 'com.android.support:appcompat-v7:22.1.0'
+    //compile 'com.android.support:appcompat-v7:19.1.0'
     compile 'com.github.channguyen:rsv:1.0.1'
     compile 'org.bytedeco:javacv:+'
     //compile 'org.bytedeco:javacv:1.2'

@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.SeekBar;
 import android.widget.VideoView;
 
@@ -16,9 +17,8 @@ import com.github.channguyen.rsv.RangeSliderView;
 
 
 public class VideoSettings extends AppCompatActivity {
-
-    private VideoView videoView;
     private RangeSliderView speedSeekbar;
+    private PlaybackControllerTask playbackControllerTask;
 
     double fps = 30;
     float speedMultiplier = 0.5f;
@@ -28,12 +28,6 @@ public class VideoSettings extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_video_settings);
         speedSeekbar = (RangeSliderView) findViewById(R.id.rsvSpeedSeekbar);
-        videoView = (VideoView) findViewById(R.id.VideoPreview);
-        Uri uri = VideoProcessor.getSourceUri();
-        videoView.setVideoURI(uri);
-        videoView.start();
-        new PlaybackControllerTask().execute();
-
         speedSeekbar.setOnSlideListener(new RangeSliderView.OnSlideListener() {
             public void onSlide(int index) {
                 if (index != 0) {
@@ -41,22 +35,26 @@ public class VideoSettings extends AppCompatActivity {
                 } else {
                     speedMultiplier = 0.5f;
                 }
-                new PlaybackControllerTask().execute();
             }
         });
     }
 
     class PlaybackControllerTask extends AsyncTask<Void, Integer, Void> {
 
+        private boolean isPlaying = true;
+
+        protected void stop() {
+            isPlaying = false;
+        }
+
         @Override
         protected void onPreExecute() {
-            // обновляем пользовательский интерфейс сразу после выполнения задачи
             super.onPreExecute();
         }
 
         @Override
         protected Void doInBackground(Void... params) {
-            while (true) {
+            while (isPlaying) {
                 try {
                     int timeToNextFrame = (int) (1000 / fps * (1 / speedMultiplier));//TODO
                     publishProgress(1);
@@ -67,15 +65,16 @@ public class VideoSettings extends AppCompatActivity {
                     e.printStackTrace();
                 }
             }
+            return null;
         }
 
         @Override
         protected void onProgressUpdate(Integer... values) {
             super.onProgressUpdate(values);
             if (values[0] == 0) {
-                videoView.pause();
+                //videoView.pause();
             } else {
-                videoView.start();
+                //videoView.start();
             }
         }
     }
@@ -93,6 +92,8 @@ public class VideoSettings extends AppCompatActivity {
         if (item.getItemId() == 1000)
         {
             VideoProcessor.setTimeScale(speedMultiplier);
+            //playbackControllerTask.stop();
+            //videoView.stopPlayback();
             navigateToRender();
         }
         return true;
