@@ -1,18 +1,14 @@
 package com.sleepycatstudios.slowy;
 
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.SystemClock;
-import android.util.FloatMath;
 import android.util.Log;
 
 import org.bytedeco.javacpp.indexer.FloatBufferIndexer;
 import org.bytedeco.javacpp.indexer.UByteBufferIndexer;
 import org.bytedeco.javacpp.opencv_core;
-import org.bytedeco.javacpp.opencv_video;
 import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.FFmpegFrameRecorder;
-import org.bytedeco.javacv.FFmpegLogCallback;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.FrameGrabber;
 import org.bytedeco.javacv.FrameGrabber.Exception;
@@ -27,41 +23,22 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static org.bytedeco.javacpp.helper.opencv_core.RGB;
-import static org.bytedeco.javacpp.opencv_core.BORDER_CONSTANT;
-import static org.bytedeco.javacpp.opencv_core.CV_16SC2;
 import static org.bytedeco.javacpp.opencv_core.CV_32F;
-import static org.bytedeco.javacpp.opencv_core.CV_32FC1;
 import static org.bytedeco.javacpp.opencv_core.CV_32FC2;
-import static org.bytedeco.javacpp.opencv_core.FILLED;
 import static org.bytedeco.javacpp.opencv_core.Mat;
-import static org.bytedeco.javacpp.opencv_core.add;
 import static org.bytedeco.javacpp.opencv_core.addWeighted;
-import static org.bytedeco.javacpp.opencv_core.cartToPolar;
-import static org.bytedeco.javacpp.opencv_core.doubleRand;
-import static org.bytedeco.javacpp.opencv_core.floatRand;
 import static org.bytedeco.javacpp.opencv_core.magnitude;
-import static org.bytedeco.javacpp.opencv_core.merge;
 import static org.bytedeco.javacpp.opencv_core.multiply;
-import static org.bytedeco.javacpp.opencv_core.normalize;
 import static org.bytedeco.javacpp.opencv_core.split;
 import static org.bytedeco.javacpp.opencv_core.subtract;
-import static org.bytedeco.javacpp.opencv_core.subtractPut;
-import static org.bytedeco.javacpp.opencv_imgproc.COLOR_BGR2GRAY;
-import static org.bytedeco.javacpp.opencv_imgproc.COLOR_RGB2BGR;
 import static org.bytedeco.javacpp.opencv_imgproc.COLOR_RGB2GRAY;
-import static org.bytedeco.javacpp.opencv_imgproc.CV_INTER_CUBIC;
-import static org.bytedeco.javacpp.opencv_imgproc.CV_INTER_LINEAR;
 import static org.bytedeco.javacpp.opencv_imgproc.CV_INTER_NN;
-import static org.bytedeco.javacpp.opencv_imgproc.CV_THRESH_TRUNC;
 import static org.bytedeco.javacpp.opencv_imgproc.THRESH_TRUNC;
 import static org.bytedeco.javacpp.opencv_imgproc.blendLinear;
-import static org.bytedeco.javacpp.opencv_imgproc.circle;
 import static org.bytedeco.javacpp.opencv_imgproc.cvtColor;
 import static org.bytedeco.javacpp.opencv_imgproc.line;
 import static org.bytedeco.javacpp.opencv_imgproc.remap;
-import static org.bytedeco.javacpp.opencv_imgproc.resize;
 import static org.bytedeco.javacpp.opencv_imgproc.threshold;
-import static org.bytedeco.javacpp.opencv_video.OPTFLOW_FARNEBACK_GAUSSIAN;
 import static org.bytedeco.javacpp.opencv_video.calcOpticalFlowFarneback;
 
 public class VideoProcessor {
@@ -183,11 +160,11 @@ public class VideoProcessor {
     }
 
     private static Mat calculateFrame(Mat sourceFrameMat, Mat nextFrameMat, Mat opticalFlow, int frameIndex, int totalFrames) {
-        Log.d("VideoProcessor", "Calulating frame " + (frameIndex + 1) + " of " + totalFrames);
+        Log.d("VideoProcessor", "Calulating frame " + (frameIndex + 1) + " of " + (totalFrames));
         double vecMultiplier = (double) (frameIndex + 1) / (totalFrames + 1);
-        Mat dstFrameMat = sourceFrameMat.clone();
+        Mat dstFrameMat = new Mat(sourceFrameMat.arrayHeight(), sourceFrameMat.arrayWidth(), sourceFrameMat.type());//sourceFrameMat.clone();
         Mat coordinatedOpticalFlow = subtract(coordMat, multiply(vecMultiplier, opticalFlow)).asMat();
-        opencv_core.MatVector coordinatedOpticalFlowSplitted = new opencv_core.MatVector(3);
+        opencv_core.MatVector coordinatedOpticalFlowSplitted = new opencv_core.MatVector(3);//TODO: change to 2
         split(coordinatedOpticalFlow, coordinatedOpticalFlowSplitted);
         remap(sourceFrameMat,
                 dstFrameMat,
@@ -200,21 +177,27 @@ public class VideoProcessor {
         /*UByteBufferIndexer fbIndexer = blendedFramesMat.createIndexer();
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
-                fbIndexer.put(y, x, 0, 255);
-                fbIndexer.put(y, x, 1, 0);
-                fbIndexer.put(y, x, 2, 255);
+                fbIndexer.put(y, x, 0, 255); fbIndexer.put(y, x, 1, 0); fbIndexer.put(y, x, 2, 255);
             }
         }*/
 
         Mat weights1 = new Mat(height, width, CV_32F);
         Mat weights2 = new Mat(height, width, CV_32F);
-        opencv_core.MatVector opticalFlowSplitted = new opencv_core.MatVector(3);
+        opencv_core.MatVector opticalFlowSplitted = new opencv_core.MatVector(3);//TODO: change to 2
         split(opticalFlow, opticalFlowSplitted);
         magnitude(opticalFlowSplitted.get(0), opticalFlowSplitted.get(1), weights2);
+        opticalFlowSplitted.deallocate();
         threshold(weights2, weights1, 1, 1, THRESH_TRUNC);
-        weights2 = subtract(new opencv_core.Scalar(1.0d), weights1).asMat();
+        weights2 = subtract(new opencv_core.Scalar(1.0d), weights1).asMat();//TODO: here leaks
         Mat resultMat = new Mat();
+        Log.d("VP", " sizes " + dstFrameMat.size().get() + ", " + blendedFramesMat.size().get() + ", " + weights1.size().get() + ", " + weights2.size().get());
         blendLinear(dstFrameMat, blendedFramesMat, weights1, weights2, resultMat);
+        coordinatedOpticalFlowSplitted.deallocate();
+        coordinatedOpticalFlow.release();
+        dstFrameMat.release();
+        blendedFramesMat.release();
+        weights1.release();
+        weights2.release();
         return resultMat;
     }
 
@@ -266,34 +249,18 @@ public class VideoProcessor {
     }
 
 
-    private static Frame[] calculateFrames(Frame framePrev, Frame frameNext, int framesForCalc) {
-        OpenCVFrameConverter.ToMat converterToMat = new OpenCVFrameConverter.ToMat();
-        Frame[] calculatedFrames = new Frame[framesForCalc + 1];
+    private static Mat[] calculateFrames(Mat framePrevMat, Mat frameNextMat, int framesForCalc) {
+        Mat[] calculatedFrames = new Mat[framesForCalc + 1];
         Mat opticalFlow = new Mat();
-        Mat framePrevMat = converterToMat.convert(framePrev);
-        Mat frameNextMat = converterToMat.convert(frameNext);
         Mat framePrevMatGray = new Mat();
         Mat frameNextMatGray = new Mat();
         cvtColor(framePrevMat, framePrevMatGray, COLOR_RGB2GRAY);
         cvtColor(frameNextMat, frameNextMatGray, COLOR_RGB2GRAY);
-        Mat framePrevMatGrayReduced = new Mat();
-        Mat frameNextMatGrayReduced = new Mat();
-        resize(framePrevMatGray,
-                framePrevMatGrayReduced,
-                new opencv_core.Size(
-                        framePrevMatGray.arrayWidth() / flowReduceFactor,
-                        framePrevMatGray.arrayHeight() / flowReduceFactor));
-        resize(frameNextMatGray,
-                frameNextMatGrayReduced,
-                new opencv_core.Size(
-                        frameNextMatGray.arrayWidth() / flowReduceFactor,
-                        frameNextMatGray.arrayHeight() / flowReduceFactor));
-        Mat opticalFlowReduced = new Mat();
+
         long optFCalcStartTime = SystemClock.currentThreadTimeMillis();
-        //optFlowDualTVL1.calc(framePrevMatGray, frameNextMatGray, opticalFlow);
-        calcOpticalFlowFarneback(framePrevMatGrayReduced,//first 8-bit single-channel input image
-                frameNextMatGrayReduced,//second input image of the same size and the same type as prev
-                opticalFlowReduced,//computed flow image that has the same size as prev and type CV_32FC2
+        calcOpticalFlowFarneback(framePrevMatGray,//first 8-bit single-channel input image
+                frameNextMatGray,//second input image of the same size and the same type as prev
+                opticalFlow,//computed flow image that has the same size as prev and type CV_32FC2
                 0.5, //parameter, specifying the image scale (<1) to build pyramids for each image;
                 // pyr_scale=0.5 means a classical pyramid, where each next layer is twice smaller
                 // than the previous one
@@ -313,18 +280,19 @@ public class VideoProcessor {
                 0);//Flags: OPTFLOW_USE_INITIAL_FLOW, OPTFLOW_FARNEBACK_GAUSSIAN
         Log.d("VideoProcessor", "Opt flow calculated in " +
                 (SystemClock.currentThreadTimeMillis() - optFCalcStartTime) / 1000 + " sec");
-        resize(opticalFlowReduced, opticalFlow,
-                new opencv_core.Size(width, height), 0, 0, CV_INTER_CUBIC);
+        framePrevMatGray.release();
+        frameNextMatGray.release();
         Mat frameMat;
-        calculatedFrames[0] = framePrev;
+        calculatedFrames[0] = framePrevMat.clone();
         for (int interpolatedFrameIndex = 1; interpolatedFrameIndex < framesForCalc + 1; interpolatedFrameIndex++) {
             //Calculating time-interpolated frame
-            frameMat = calculateFrame(framePrevMat, frameNextMat, opticalFlow, interpolatedFrameIndex, framesToCalculate);
-            // Convert processedMat back to a Frame
-            Frame frame = converterToMat.convert(frameMat);
+            frameMat = calculateFrame(framePrevMat, frameNextMat, opticalFlow, interpolatedFrameIndex - 1, framesToCalculate);
             //Add frame to array of calculated frames
-            calculatedFrames[interpolatedFrameIndex] = frame;
+            calculatedFrames[interpolatedFrameIndex] = frameMat.clone();
+            frameMat.release();
         }
+
+        opticalFlow.release();
         return calculatedFrames;
     }
 
@@ -343,8 +311,7 @@ public class VideoProcessor {
     }
 
     private static void startProcessing() {
-        Log.d("VideoProcessor", "PyramidsCount=" + pyramidsCount);
-
+        OpenCVFrameConverter.ToMat converterToMat = new OpenCVFrameConverter.ToMat();
         isProcessing = true;
 
         if (progressListener != null)
@@ -355,62 +322,37 @@ public class VideoProcessor {
         initEncoder();
         GetFramesCountForCalculation();
         calcPyramidsCount();
-
+        Log.d("VideoProcessor", "PyramidsCount=" + pyramidsCount);
+        Frame tmpFrame;
+        Mat framePrevMat;
+        Mat frameNextMat;
         try {
             //Processing video frames
-            Frame framePrev;
             do {
-                framePrev = grabber.grab().clone();
-            } while (framePrev.image == null);
+                tmpFrame = grabber.grab();
+            } while (tmpFrame.image == null);
+            framePrevMat = converterToMat.convert(tmpFrame).clone();
 
             Log.d("VideoProcessor", "Video length is " + grabber.getLengthInFrames() + "frames");
 
-            while (grabber.getFrameNumber() < 15 && isProcessing) {
-            //while (grabber.getFrameNumber() < grabber.getLengthInFrames() && isProcessing) {
+            //while (grabber.getFrameNumber() < 15 && isProcessing) {
+            while (grabber.getFrameNumber() < grabber.getLengthInFrames() && isProcessing) {
                 Log.d("VideoProcessor", "Creating new threads");
                 Log.d("VideoProcessor", "Current frame number is " + grabber.getFrameNumber());
-                /*for (int i = 0; i < frameCalcThreads.length; i++) {
-                    frameCalcThreads[i] = null;
-                }
-
-                System.gc();
-
                 for (int i = 0; i < frameCalcThreads.length; i++) {
                     if (grabber.getFrameNumber() < grabber.getLengthInFrames()) {
-                        Frame frameNext;
                         do {
-                            frameNext = grabber.grab();
-                        } while (frameNext.image == null);
-                        frameCalcThreads[i] = new FrameCalcThread(framePrev, frameNext);
+                            tmpFrame = grabber.grab();
+                        } while (tmpFrame.image == null);
+                        frameNextMat = converterToMat.convert(tmpFrame);
+                        frameCalcThreads[i] = new FrameCalcThread(framePrevMat, frameNextMat);
                         Log.d("VideoProcessor", "Created thread with id " + frameCalcThreads[i].getId());
-                        framePrev = frameNext.clone();
                         frameCalcThreads[i].start();
-                    }
-                }*/
-
-
-                for (int i = 0; i < frameCalcThreads.length; i++) {
-                    if (grabber.getFrameNumber() < grabber.getLengthInFrames()) {
-                        Frame frameNext;
-                        do {
-                            frameNext = grabber.grab();
-                        } while (frameNext.image == null);
-                        if (frameCalcThreads[i] == null) {
-                            frameCalcThreads[i] = new FrameCalcThread(framePrev, frameNext);
-                            Log.d("VideoProcessor", "Created thread with id " + frameCalcThreads[i].getId());
-                        }
-                        else {
-                            frameCalcThreads[i].framePrev = framePrev;
-                            frameCalcThreads[i].frameNext = frameNext;
-                            Log.d("VideoProcessor", "Reused thread with id " + frameCalcThreads[i].getId());
-                        }
-                        framePrev = frameNext.clone();
-                        frameCalcThreads[i].start();
-                    } else {
-                        frameCalcThreads[i] = null;
+                        framePrevMat.release();
+                        framePrevMat = frameNextMat.clone();
+                        frameNextMat.release();
                     }
                 }
-
 
                 //Telling threads to wait other threads
                 for (int i = 0; i < frameCalcThreads.length; i++) {
@@ -426,12 +368,15 @@ public class VideoProcessor {
                 }
 
                 //Recording original and generated frames for every thread
-                for (FrameCalcThread thread : frameCalcThreads) {
-                    if (thread != null) {
-                        for (Frame frame : thread.result) {
-                            recorder.record(frame);
+                for (int i = 0; i < frameCalcThreads.length; i++) {
+                    if (frameCalcThreads[i] != null) {
+                        for (int j = 0; j < frameCalcThreads[i].result.length; j++) {
+                            Log.d("VP", "Recording frame " + frameCalcThreads[i].result[j] + ", " + frameCalcThreads[i].getId());
+                            recorder.record(converterToMat.convert(frameCalcThreads[i].result[j]));
+                            frameCalcThreads[i].result[j].release();
                         }
                     }
+                    frameCalcThreads[i] = null;
                 }
                 if (progressListener != null) {
                     float progress = (float) grabber.getFrameNumber() / grabber.getLengthInFrames();
@@ -439,7 +384,9 @@ public class VideoProcessor {
                     progressListener.onMediaProgress(progress);
                 }
             }
-            recorder.record(framePrev);
+            recorder.record(tmpFrame);//TODO: this may cause still frames in the end
+            framePrevMat.release();
+            //frameNextMat.release();
         } catch (FrameRecorder.Exception e) {
             e.printStackTrace();
         } catch (FrameGrabber.Exception e) {
@@ -463,19 +410,19 @@ public class VideoProcessor {
             Log.d("VideoProcessor", "Failed to stop grabber");
         }
         long finishTime = SystemClock.currentThreadTimeMillis();
-        Log.d("VideoProcessor", "Finished in " + finishTime / 1000 + " sec");
+        Log.d("VideoProcessor", "Finished in " + (finishTime - startTime) / 1000 + " sec");
         if (progressListener != null && isProcessing)
             progressListener.onMediaDone();
         isProcessing = false;
     }
 
     static class FrameCalcThread extends Thread {
-        Frame framePrev;
-        Frame frameNext;
+        Mat framePrev;
+        Mat frameNext;
 
-        Frame[] result;
+        Mat[] result;
 
-        public FrameCalcThread(Frame framePrev, Frame frameNext) {
+        public FrameCalcThread(Mat framePrev, Mat frameNext) {
             this.framePrev = framePrev.clone();
             this.frameNext = frameNext.clone();
             this.setPriority(NORM_PRIORITY);
@@ -485,10 +432,8 @@ public class VideoProcessor {
         public void run() {
             Log.d("VideoProcessor", "Calculation in thread " + this.getId() + " between frame " + grabber.getFrameNumber() + " and frame " + (grabber.getFrameNumber() + 1));
             result = calculateFrames(framePrev, frameNext, framesToCalculate);
-            this.framePrev = null;
-            this.frameNext = null;
+            this.framePrev.release();
+            this.frameNext.release();
         }
     }
 }
-
-
