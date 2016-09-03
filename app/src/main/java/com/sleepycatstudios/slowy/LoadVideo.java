@@ -2,6 +2,8 @@ package com.sleepycatstudios.slowy;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.PixelFormat;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Handler;
@@ -20,6 +22,7 @@ import com.sleepycatstudios.slowy.VideoProcessor;
 
 public class LoadVideo extends AppCompatActivity {
 
+    VideoView videoView;
     private static final int CHOOSE_VIDEO_REQUEST_CODE = 42;
 
     @Override
@@ -29,6 +32,49 @@ public class LoadVideo extends AppCompatActivity {
         //getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         setContentView(R.layout.activity_load_video);
+        getWindow().setFormat(PixelFormat.TRANSLUCENT);
+        videoView = (VideoView) findViewById(R.id.videoView);
+        videoView.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+            @Override
+            public void onCompletion(MediaPlayer mp) {
+                videoView.start();
+            }
+        });
+        videoView.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+            @Override
+            public void onPrepared(MediaPlayer mp) {
+                int videoWidth = mp.getVideoWidth();
+                int videoHeight = mp.getVideoHeight();
+
+                //Get the width of the screen
+                int screenWidth = getWindowManager().getDefaultDisplay().getWidth();
+                int screenHeight = getWindowManager().getDefaultDisplay().getHeight();
+
+                //Get the SurfaceView layout parameters
+                android.view.ViewGroup.LayoutParams lp = videoView.getLayoutParams();
+
+                //Set the width of the SurfaceView to the width of the screen
+                //lp.width = screenWidth;
+                lp.height = screenHeight;
+
+                //Set the height of the SurfaceView to match the aspect ratio of the video
+                //be sure to cast these as floats otherwise the calculation will likely be 0
+                //lp.height = (int) (((float)videoHeight / (float)videoWidth) * (float)screenWidth);
+                lp.width = (int) (((float)videoWidth / (float) videoHeight) * (float) screenHeight);
+                //Commit the layout parameters
+                videoView.setLayoutParams(lp);
+            }
+        });
+        videoView.setVideoURI(Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.slowmobackground));
+        videoView.start();
+
+
+    }
+
+    @Override
+    protected void onResume() {
+        videoView.start();
+        super.onResume();
     }
 
     public void pickFile(View v) {
