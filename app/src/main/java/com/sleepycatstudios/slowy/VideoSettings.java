@@ -1,5 +1,6 @@
 package com.sleepycatstudios.slowy;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -7,9 +8,14 @@ import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.DragEvent;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
+import android.view.SurfaceView;
 import android.view.View;
+import android.widget.Button;
+import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.VideoView;
 
@@ -18,16 +24,119 @@ import com.github.channguyen.rsv.RangeSliderView;
 
 public class VideoSettings extends AppCompatActivity {
     private RangeSliderView speedSeekbar;
-    private PlaybackControllerTask playbackControllerTask;
-
     double fps = 30;
     float speedMultiplier = 0.5f;
+    SurfaceView videoSurfaceView = null;
+    SeekBar videoProgerssSeekbar = null;
+    Button slowmoButton = null;
+    Button clearSlowmoButton = null;
+    IProgressListener progressListener;
+    VideoSlowmoEditor editor = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_video_settings);
         speedSeekbar = (RangeSliderView) findViewById(R.id.rsvSpeedSeekbar);
+        videoSurfaceView = (SurfaceView) findViewById(R.id.videoSurfaceView);
+        videoProgerssSeekbar = (SeekBar) findViewById(R.id.videoProgerssSeekbar);
+        slowmoButton = (Button) findViewById(R.id.slowmoButton);
+        clearSlowmoButton = (Button) findViewById(R.id.clearSlowmoButton);
+
+        progressListener = new IProgressListener() {
+            @Override
+            public void onMediaStart() {
+
+            }
+
+            @Override
+            public void onMediaProgress(final float progress) {
+                final float mediaProgress = progress;
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        videoProgerssSeekbar.setProgress(Math.round(mediaProgress * 100));
+                    }
+                });
+            }
+
+            @Override
+            public void onMediaDone() {
+
+            }
+
+            @Override
+            public void onMediaPause() {
+
+            }
+
+            @Override
+            public void onMediaStop() {
+
+            }
+
+            @Override
+            public void onError(Exception exception) {
+
+            }
+        };
+
+        editor = new VideoSlowmoEditor(this, videoSurfaceView);
+        editor.setProgressListener(progressListener);
+
+        slowmoButton.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getAction() & MotionEvent.ACTION_MASK) {
+                    case MotionEvent.ACTION_DOWN:
+                        if (editor != null)
+                            editor.slowerSpeed();
+                        break;
+                    case MotionEvent.ACTION_UP:
+                        if (editor != null)
+                            editor.normalSpeed();
+                        break;
+                }
+                return false;
+            }
+        });
+
+        clearSlowmoButton.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getAction() & MotionEvent.ACTION_MASK) {
+                    case MotionEvent.ACTION_DOWN:
+                        break;
+                    case MotionEvent.ACTION_UP:
+                        if (editor != null)
+                            editor.clearSlowmo();
+                        break;
+                }
+                return false;
+            }
+        });
+
+        videoProgerssSeekbar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                //if (fromUser)
+                    //editor.seekTo((float) progress / 100);
+
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+                editor.pause();
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                editor.seekTo((float) seekBar.getProgress() / 100);
+                editor.start();
+            }
+        });
+
+
         speedSeekbar.setOnSlideListener(new RangeSliderView.OnSlideListener() {
             public void onSlide(int index) {
                 if (index != 0) {
@@ -35,6 +144,7 @@ public class VideoSettings extends AppCompatActivity {
                 } else {
                     speedMultiplier = 0.5f;
                 }
+                editor.setSlowmoSpeed(speedMultiplier);
             }
         });
     }
@@ -101,6 +211,8 @@ public class VideoSettings extends AppCompatActivity {
 
     private void navigateToRender()
     {
+        VideoProcessor.setSlowFrames(editor.getSlowFrames());
+
         Intent navIntent = new Intent(this, Render.class);
         startActivity(navIntent);
     }

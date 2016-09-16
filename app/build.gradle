@@ -1,6 +1,14 @@
 apply plugin: 'com.android.application'
 
 android {
+    signingConfigs {
+        release {
+            keyAlias 'slowy'
+            keyPassword 'bf109g'
+            storeFile file('C:/Slowy/keystorepsw-bf109g_alias-slowy_password-bf109g.keystore')
+            storePassword 'bf109g'
+        }
+    }
     compileSdkVersion 22
     buildToolsVersion '24.0.1'
     defaultConfig {
@@ -12,32 +20,31 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled true
+            minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
         debug {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             renderscriptDebuggable true
+            signingConfig signingConfigs.release
         }
         jnidebug {
             // This copies the debuggable attribute and debug signing configurations.
             initWith debug
-
             applicationIdSuffix ".jnidebug"
             jniDebuggable true
         }
-
     }
     productFlavors {
     }
-
     packagingOptions {
         exclude 'META-INF/services/javax.annotation.processing.Processor'
-        pickFirst  'META-INF/maven/org.bytedeco.javacpp-presets/opencv/pom.properties'
-        pickFirst  'META-INF/maven/org.bytedeco.javacpp-presets/opencv/pom.xml'
-        pickFirst  'META-INF/maven/org.bytedeco.javacpp-presets/ffmpeg/pom.properties'
-        pickFirst  'META-INF/maven/org.bytedeco.javacpp-presets/ffmpeg/pom.xml'
+        pickFirst 'META-INF/maven/org.bytedeco.javacpp-presets/opencv/pom.properties'
+        pickFirst 'META-INF/maven/org.bytedeco.javacpp-presets/opencv/pom.xml'
+        pickFirst 'META-INF/maven/org.bytedeco.javacpp-presets/ffmpeg/pom.properties'
+        pickFirst 'META-INF/maven/org.bytedeco.javacpp-presets/ffmpeg/pom.xml'
     }
 }
 

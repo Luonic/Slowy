@@ -51,6 +51,8 @@ public class VideoProcessor {
     private static Uri inputVideoUri;
     private static String outputVideoPath;
 
+    private static boolean[] slowFrames = null;
+
     private static int width;
     private static int height;
     private static float fps;
@@ -66,7 +68,6 @@ public class VideoProcessor {
     private static int flowReduceFactor = 1;
 
     private static FrameCalcThread[] frameCalcThreads = new FrameCalcThread[Runtime.getRuntime().availableProcessors()];
-    ExecutorService threadPool = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
     public void onCreate() {
 
@@ -75,6 +76,11 @@ public class VideoProcessor {
     public static void setProgressListner(IProgressListener progressListener)
     {
         VideoProcessor.progressListener = progressListener;
+    }
+
+    public static void setSlowFrames(boolean[] slowFrames)
+    {
+        VideoProcessor.slowFrames = slowFrames;
     }
 
     private static void GetFramesCountForCalculation() {
@@ -335,15 +341,34 @@ public class VideoProcessor {
 
             Log.d("VideoProcessor", "Video length is " + grabber.getLengthInFrames() + "frames");
 
-            //while (grabber.getFrameNumber() < 15 && isProcessing) {
+            //while (grabber.getFrameNumber() < 20 && isProcessing) {
             while (grabber.getFrameNumber() < grabber.getLengthInFrames() && isProcessing) {
                 Log.d("VideoProcessor", "Creating new threads");
                 Log.d("VideoProcessor", "Current frame number is " + grabber.getFrameNumber());
                 for (int i = 0; i < frameCalcThreads.length; i++) {
                     if (grabber.getFrameNumber() < grabber.getLengthInFrames()) {
-                        do {
-                            tmpFrame = grabber.grab();
-                        } while (tmpFrame.image == null);
+                        while (!slowFrames[grabber.getFrameNumber()]) {
+                            recorder.record(tmpFrame);
+
+                            if (progressListener != null) {
+                                float progress = (float) grabber.getFrameNumber() / grabber.getLengthInFrames();
+                                Log.d("VideoProcessor", "Progress = " + progress);
+                                progressListener.onMediaProgress(progress);
+                            }
+
+                            if (grabber.getFrameNumber() < grabber.getLengthInFrames()) {
+                                do {
+                                    tmpFrame = grabber.grab();//TODO: Replace with grabImage();
+                                } while (tmpFrame.image == null);
+                            }
+                        }
+
+                        if (grabber.getFrameNumber() < grabber.getLengthInFrames()) {
+                            do {
+                                tmpFrame = grabber.grab();
+                            } while (tmpFrame.image == null);
+                        }
+
                         frameNextMat = converterToMat.convert(tmpFrame);
                         frameCalcThreads[i] = new FrameCalcThread(framePrevMat, frameNextMat);
                         Log.d("VideoProcessor", "Created thread with id " + frameCalcThreads[i].getId());

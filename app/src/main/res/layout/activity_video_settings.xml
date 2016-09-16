@@ -18,6 +18,28 @@
         android:minHeight="100dp"
         android:orientation="vertical">
 
+        <SurfaceView
+            android:id="@+id/videoSurfaceView"
+            android:layout_width="match_parent"
+            android:layout_height="250dp" />
+
+        <SeekBar
+            android:id="@+id/videoProgerssSeekbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <Button
+            android:id="@+id/slowmoButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SLOW"/>
+
+        <Button
+            android:id="@+id/clearSlowmoButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Clear"/>
+
         <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
