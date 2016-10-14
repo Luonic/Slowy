@@ -1,6 +1,7 @@
 package com.sleepycatstudios.slowy;
 
 import android.net.Uri;
+import android.os.Debug;
 import android.os.SystemClock;
 import android.util.Log;
 
@@ -343,9 +344,16 @@ public class VideoProcessor {
 
             //while (grabber.getFrameNumber() < 20 && isProcessing) {
             while (grabber.getFrameNumber() < grabber.getLengthInFrames() && isProcessing) {
+
                 Log.d("VideoProcessor", "Creating new threads");
                 Log.d("VideoProcessor", "Current frame number is " + grabber.getFrameNumber());
                 for (int i = 0; i < frameCalcThreads.length; i++) {
+                    Runtime.getRuntime().gc();
+
+                    Log.d("VP", "Memory used: " + Long.toString(Utils.getUsedMemorySize()) + " Mb");
+                    Log.d("VP", "Memory free: " + Long.toString(Utils.getFreeMemorySize()) + " Mb");
+                    Log.d("VP", "Native Heap Free Size = " + Long.toString(Utils.getFreeNativeMemory()) + " Mb");
+
                     if (grabber.getFrameNumber() < grabber.getLengthInFrames()) {
                         while (!slowFrames[grabber.getFrameNumber()]) {
                             recorder.record(tmpFrame);
@@ -355,6 +363,10 @@ public class VideoProcessor {
                                 Log.d("VideoProcessor", "Progress = " + progress);
                                 progressListener.onMediaProgress(progress);
                             }
+
+                            Log.d("VP", "Memory used: " + Long.toString(Utils.getUsedMemorySize()) + "Mb");
+                            Log.d("VP", "Memory free: " + Long.toString(Utils.getFreeMemorySize()) + "Mb");
+                            Log.d("VP", "Native Heap Free Size = " + Long.toString(Utils.getFreeNativeMemory()) + " Mb");
 
                             if (grabber.getFrameNumber() < grabber.getLengthInFrames()) {
                                 do {
@@ -408,6 +420,9 @@ public class VideoProcessor {
                     Log.d("VideoProcessor", "Progress = " + progress);
                     progressListener.onMediaProgress(progress);
                 }
+                Log.d("VP", "Memory used: " + Long.toString(Utils.getUsedMemorySize()) + "Mb");
+                Log.d("VP", "Memory free: " + Long.toString(Utils.getFreeMemorySize()) + "Mb");
+                Log.d("VP", "Native Heap Free Size = " + Long.toString(Utils.getFreeNativeMemory()) + "Mb");
             }
             recorder.record(tmpFrame);//TODO: this may cause still frames in the end
             framePrevMat.release();

@@ -14,7 +14,8 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat.Light">
+        android:theme="@style/Theme.AppCompat.Light"
+        android:largeHeap="true">
         <activity android:name=".LoadVideo"
             android:theme="@style/Theme.AppCompat.NoActionBar">
             <intent-filter>

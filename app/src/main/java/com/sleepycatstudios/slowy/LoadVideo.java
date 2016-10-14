@@ -105,6 +105,7 @@ public class LoadVideo extends AppCompatActivity {
 
     private void navigateToSettings()
     {
+        videoView.pause();
         Intent navIntent = new Intent(this, VideoSettings.class);
         startActivity(navIntent);
     }

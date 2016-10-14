@@ -18,6 +18,8 @@ import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.VideoView;
+import android.support.design.widget.FloatingActionButton;
+import android.support.v7.app.AppCompatActivity;
 
 import com.github.channguyen.rsv.RangeSliderView;
 
@@ -28,7 +30,7 @@ public class VideoSettings extends AppCompatActivity {
     float speedMultiplier = 0.5f;
     SurfaceView videoSurfaceView = null;
     SeekBar videoProgerssSeekbar = null;
-    Button slowmoButton = null;
+    FloatingActionButton slowmoButton = null;
     Button clearSlowmoButton = null;
     IProgressListener progressListener;
     VideoSlowmoEditor editor = null;
@@ -40,7 +42,7 @@ public class VideoSettings extends AppCompatActivity {
         speedSeekbar = (RangeSliderView) findViewById(R.id.rsvSpeedSeekbar);
         videoSurfaceView = (SurfaceView) findViewById(R.id.videoSurfaceView);
         videoProgerssSeekbar = (SeekBar) findViewById(R.id.videoProgerssSeekbar);
-        slowmoButton = (Button) findViewById(R.id.slowmoButton);
+        slowmoButton = (FloatingActionButton) findViewById(R.id.slowmoButton);
         clearSlowmoButton = (Button) findViewById(R.id.clearSlowmoButton);
 
         progressListener = new IProgressListener() {
@@ -212,7 +214,7 @@ public class VideoSettings extends AppCompatActivity {
     private void navigateToRender()
     {
         VideoProcessor.setSlowFrames(editor.getSlowFrames());
-
+        editor.pause();
         Intent navIntent = new Intent(this, Render.class);
         startActivity(navIntent);
     }

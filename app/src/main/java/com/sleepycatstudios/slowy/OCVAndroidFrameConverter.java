@@ -164,6 +164,7 @@ public class OCVAndroidFrameConverter extends AndroidFrameConverter {
         if (frame.imageChannels == 1) {
             mat = oCVConverter.convert(frame);
             cvtColor(mat, mat, COLOR_GRAY2RGBA);
+            Log.d("OCVAFC", "Will copy bytes now");
             bitmap.copyPixelsFromBuffer(mat.getByteBuffer().position(0));
             mat.release();
         } else if (frame.imageChannels == 3) {
